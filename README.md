@@ -15,9 +15,9 @@ Voyant orchestrates specialized AI agents to create comprehensive travel itinera
   Your browser does not support the video tag.
 </video>
 
+[🎥 **Click here to watch the demo video**](attached_assets/Demo.mp4)
+
 > *Watch Voyant in action: Planning a complete trip to Paris with real-time agent coordination.*
->
-> *(Note: Place your video file named `demo.mp4` in the `attached_assets` folder)*
 
 ## ✨ Key Features
 
