@@ -3,8 +3,10 @@ from datetime import datetime
 from typing import List, Dict
 
 
+from src.apis.amadeus_client import AmadeusClient
+
 class MockHotelAPI:
-    """Mock Hotel API for demonstration purposes"""
+    """Hotel API using Amadeus with fallback to mock"""
 
     HOTELS = [
         {
@@ -36,6 +38,7 @@ class MockHotelAPI:
 
     def __init__(self, failure_rate: float = 0.0):
         self.failure_rate = failure_rate
+        self.amadeus = AmadeusClient()
 
     def search_hotels(
         self, location: str, check_in: str, check_out: str, guests: int = 1
@@ -48,6 +51,45 @@ class MockHotelAPI:
         check_out_date = datetime.fromisoformat(check_out)
         nights = (check_out_date - check_in_date).days
 
+        if self.amadeus.client:
+            try:
+                # Resolve location to IATA code
+                loc_data = self.amadeus.get_location_coords(location)
+                if loc_data and loc_data.get("iataCode"):
+                    city_code = loc_data["iataCode"]
+                    real_hotels = self.amadeus.search_hotel_offers(city_code, check_in, check_out, guests)
+                    
+                    hotels = []
+                    for offer in real_hotels:
+                        hotel_data = offer.get("hotel", {})
+                        offers = offer.get("offers", [])
+                        if not offers: continue
+                        
+                        price_obj = offers[0].get("price", {})
+                        price_total = float(price_obj.get("total", 0))
+                        
+                        # Calculate per night roughly
+                        price_per_night = price_total / max(1, nights)
+                        
+                        h = {
+                            "hotel_id": hotel_data.get("hotelId"),
+                            "name": hotel_data.get("name"),
+                            "location": location,
+                            "check_in": check_in,
+                            "check_out": check_out,
+                            "price_per_night": round(price_per_night, 2),
+                            "total_price": round(price_total, 2),
+                            "rating": float(hotel_data.get("rating", 0)) if hotel_data.get("rating") else 4.0, # Default if missing
+                            "amenities": ["Standard Amenities"] # Amadeus basic offer search might not have full amenities list easily accessible
+                        }
+                        hotels.append(h)
+                    
+                    if hotels:
+                        return sorted(hotels, key=lambda x: x["total_price"])
+            except Exception as e:
+                print(f"Amadeus hotel search failed: {e}. Falling back to mock.")
+
+        # Fallback to mock
         hotels = []
         for hotel_template in self.HOTELS:
             price_per_night = round(random.uniform(80, 300), 2)

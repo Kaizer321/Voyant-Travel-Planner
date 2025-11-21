@@ -1,4 +1,5 @@
-from crewai import Agent, Task
+import os
+from crewai import Agent, Task, LLM
 from typing import Dict, Any
 from src.mock_apis.hotel_api import MockHotelAPI
 from src.protocols.a2a_protocol import AgentInterface
@@ -22,6 +23,7 @@ class HotelAgent(AgentInterface):
             "Skilled at matching travelers with perfect stays based on their needs and preferences.",
             verbose=True,
             allow_delegation=False,
+            llm=LLM(model=os.getenv("CREWAI_DEFAULT_MODEL", "gemini-1.5-flash")),
         )
 
     async def receive_message(self, message: Dict[str, Any]) -> Dict[str, Any]:

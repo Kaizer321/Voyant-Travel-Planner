@@ -14,6 +14,7 @@ class MCPContext:
         self.context_store: Dict[str, Any] = {}
         self.dependencies: Dict[str, List[str]] = {}
         self.access_log: List[Dict[str, Any]] = []
+        self.vector_clocks: Dict[str, int] = {}  # Simulated vector clock per key
         self.lock = Lock()
 
     def set_context(
@@ -21,11 +22,14 @@ class MCPContext:
     ):
         """Set context value with dependency tracking"""
         with self.lock:
+            self.vector_clocks[key] = self.vector_clocks.get(key, 0) + 1
+            
             self.context_store[key] = {
                 "value": value,
                 "agent_id": agent_id,
                 "timestamp": datetime.utcnow().isoformat(),
-                "version": self._get_next_version(key),
+                "version": self.vector_clocks[key],
+                "vector_clock": self.vector_clocks[key],
             }
 
             if dependencies:
@@ -52,9 +56,12 @@ class MCPContext:
             current_value = self.context_store[key]["value"]
             if isinstance(current_value, dict):
                 current_value.update(updates)
+                self.vector_clocks[key] = self.vector_clocks.get(key, 0) + 1
+                
                 self.context_store[key]["value"] = current_value
                 self.context_store[key]["timestamp"] = datetime.utcnow().isoformat()
-                self.context_store[key]["version"] = self._get_next_version(key)
+                self.context_store[key]["version"] = self.vector_clocks[key]
+                self.context_store[key]["vector_clock"] = self.vector_clocks[key]
                 self._log_access(agent_id, "update", key)
                 return True
             return False
@@ -119,3 +126,15 @@ class MCPContext:
                     )
         
         return conflicts
+
+    def semantic_merge(self, key: str, value1: Any, value2: Any) -> Any:
+        """
+        Semantic merge operation for conflict resolution (stub).
+        In a real distributed system, this would reconcile divergent states.
+        """
+        # Simple strategy: prefer the one with more keys if dict, else value2
+        if isinstance(value1, dict) and isinstance(value2, dict):
+            merged = value1.copy()
+            merged.update(value2)
+            return merged
+        return value2

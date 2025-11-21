@@ -119,8 +119,8 @@ class ReplanningEngine:
                 new_hotel = await self.meta_agent._book_hotel(request)
                 if new_hotel:
                     itinerary.hotel = new_hotel
-                    self.mcp_context.update_context(
-                        "hotel", new_hotel, "replanning_engine"
+                    self.mcp_context.set_context(
+                        "hotel", new_hotel.model_dump(), "replanning_engine", dependencies=["outbound_flight"]
                     )
 
             if itinerary.hotel:
@@ -128,10 +128,11 @@ class ReplanningEngine:
                     request, itinerary.weather_forecast
                 )
                 itinerary.activities = activities
-                self.mcp_context.update_context(
+                self.mcp_context.set_context(
                     "activities",
                     [a.model_dump() for a in activities],
                     "replanning_engine",
+                    dependencies=["weather_forecast", "hotel"],
                 )
 
             itinerary.total_cost = self.meta_agent._calculate_total_cost(itinerary)

@@ -44,7 +44,7 @@ class HotelDetails(BaseModel):
     price_per_night: float
     total_price: float
     rating: float
-    amenities: List[str] = []
+    amenities: List[str] = Field(default_factory=list)
 
 
 class WeatherInfo(BaseModel):
@@ -73,12 +73,12 @@ class TravelItinerary(BaseModel):
     outbound_flight: Optional[FlightDetails] = None
     return_flight: Optional[FlightDetails] = None
     hotel: Optional[HotelDetails] = None
-    weather_forecast: List[WeatherInfo] = []
-    activities: List[ActivityDetails] = []
+    weather_forecast: List[WeatherInfo] = Field(default_factory=list)
+    activities: List[ActivityDetails] = Field(default_factory=list)
     total_cost: float = 0.0
     remaining_budget: float = 0.0
-    agent_logs: List[str] = []
-    verification_results: Dict[str, Any] = {}
+    agent_logs: List[str] = Field(default_factory=list)
+    verification_results: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -93,6 +93,6 @@ class AgentMessage(BaseModel):
 
 class VerificationResult(BaseModel):
     is_valid: bool
-    errors: List[str] = []
-    warnings: List[str] = []
-    suggestions: List[str] = []
+    errors: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    suggestions: List[str] = Field(default_factory=list)

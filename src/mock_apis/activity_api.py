@@ -2,8 +2,10 @@ import random
 from typing import List, Dict
 
 
+from src.apis.amadeus_client import AmadeusClient
+
 class MockActivityAPI:
-    """Mock Activity API for demonstration purposes"""
+    """Activity API using Amadeus with fallback to mock"""
 
     ACTIVITIES = {
         "Sightseeing": [
@@ -30,6 +32,7 @@ class MockActivityAPI:
 
     def __init__(self, failure_rate: float = 0.0):
         self.failure_rate = failure_rate
+        self.amadeus = AmadeusClient()
 
     def search_activities(
         self, location: str, category: str = None, max_results: int = 5
@@ -38,6 +41,36 @@ class MockActivityAPI:
         if random.random() < self.failure_rate:
             raise Exception("Activity API temporarily unavailable")
 
+        if self.amadeus.client:
+            try:
+                # Resolve location to coordinates
+                loc_data = self.amadeus.get_location_coords(location)
+                if loc_data:
+                    real_activities = self.amadeus.search_activities(loc_data["latitude"], loc_data["longitude"])
+                    
+                    activities = []
+                    for act in real_activities:
+                        price_amount = float(act.get("price", {}).get("amount", 0))
+                        
+                        activity = {
+                            "activity_id": act.get("id"),
+                            "name": act.get("name"),
+                            "description": act.get("shortDescription", f"Enjoy {act.get('name')}"),
+                            "location": location,
+                            "date": "flexible",
+                            "duration": "2h", # Default as Amadeus might not provide duration easily in this endpoint
+                            "price": price_amount,
+                            "category": category or "General",
+                            "rating": float(act.get("rating", 0))
+                        }
+                        activities.append(activity)
+                    
+                    if activities:
+                        return activities[:max_results]
+            except Exception as e:
+                print(f"Amadeus activity search failed: {e}. Falling back to mock.")
+
+        # Fallback to mock
         activities = []
         categories = [category] if category else list(self.ACTIVITIES.keys())
 

@@ -1,4 +1,5 @@
-from crewai import Agent, Task
+import os
+from crewai import Agent, Task, LLM
 from typing import Dict, Any
 from src.mock_apis.weather_api import MockWeatherAPI
 from src.protocols.a2a_protocol import AgentInterface
@@ -22,6 +23,7 @@ class WeatherAgent(AgentInterface):
             "Helps travelers prepare for weather conditions and plan activities accordingly.",
             verbose=True,
             allow_delegation=False,
+            llm=LLM(model=os.getenv("CREWAI_DEFAULT_MODEL", "gemini-1.5-flash")),
         )
 
     async def receive_message(self, message: Dict[str, Any]) -> Dict[str, Any]:

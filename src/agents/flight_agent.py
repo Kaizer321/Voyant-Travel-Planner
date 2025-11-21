@@ -1,4 +1,5 @@
-from crewai import Agent, Task
+import os
+from crewai import Agent, Task, LLM
 from typing import Dict, Any
 from src.mock_apis.flight_api import MockFlightAPI
 from src.protocols.a2a_protocol import AgentInterface
@@ -22,6 +23,7 @@ class FlightAgent(AgentInterface):
             "Skilled at finding optimal flight combinations considering price, duration, and convenience.",
             verbose=True,
             allow_delegation=False,
+            llm=LLM(model=os.getenv("CREWAI_DEFAULT_MODEL", "gemini-1.5-flash")),
         )
 
     async def receive_message(self, message: Dict[str, Any]) -> Dict[str, Any]:

@@ -1,7 +1,8 @@
-from crewai import Agent, Crew, Task, Process
+import os
+from crewai import Agent, Crew, Task, Process, LLM
 from typing import Dict, Any, List
 from datetime import datetime
-from src.models.schemas import TravelRequest, TravelItinerary, PlanningStatus
+from src.models.schemas import TravelRequest, TravelItinerary, PlanningStatus, FlightDetails, HotelDetails, ActivityDetails, WeatherInfo
 from src.protocols.a2a_protocol import A2AProtocol
 from src.protocols.mcp_context import MCPContext
 from src.agents.flight_agent import FlightAgent
@@ -14,7 +15,7 @@ class MetaAgent:
     """
     Meta-Agent: Central coordinator responsible for:
     - Parsing user requests and extracting planning constraints
-    - Decomposing complex itineraries into manageable sub-tasks
+    - Decomposing complex itineraries into manageable sub-tasks (Hierarchical Task Decomposition)
     - Orchestrating agent collaboration through A2A protocol
     - Monitoring overall system health and performance
     """
@@ -46,13 +47,19 @@ class MetaAgent:
             "Ensures all aspects of travel are seamlessly integrated and optimized.",
             verbose=True,
             allow_delegation=True,
+            llm=LLM(model=os.getenv("CREWAI_DEFAULT_MODEL", "gemini-1.5-flash")),
         )
 
     async def process_travel_request(
         self, request: TravelRequest
     ) -> TravelItinerary:
         """
-        Process travel request through hierarchical task decomposition
+        Process travel request through hierarchical task decomposition.
+        The Meta-Agent breaks down the request into:
+        1. Flight Booking (Outbound & Return)
+        2. Hotel Booking (Dependent on Flights)
+        3. Weather Forecast (Dependent on Location/Dates)
+        4. Activity Recommendations (Dependent on Weather & Hotel)
         """
         itinerary = TravelItinerary(
             request_id=request.request_id,
@@ -76,11 +83,11 @@ class MetaAgent:
             if outbound_flight:
                 itinerary.outbound_flight = outbound_flight
                 itinerary.agent_logs.append(
-                    f"[{datetime.utcnow().isoformat()}] Flight Agent: Outbound flight booked - {outbound_flight.get('flight_id')}"
+                    f"[{datetime.utcnow().isoformat()}] Flight Agent: Outbound flight booked - {outbound_flight.flight_id}"
                 )
                 self.mcp_context.set_context(
                     "outbound_flight",
-                    outbound_flight,
+                    outbound_flight.model_dump(),
                     "flight_agent",
                     dependencies=["travel_request"],
                 )
@@ -89,11 +96,11 @@ class MetaAgent:
             if return_flight:
                 itinerary.return_flight = return_flight
                 itinerary.agent_logs.append(
-                    f"[{datetime.utcnow().isoformat()}] Flight Agent: Return flight booked - {return_flight.get('flight_id')}"
+                    f"[{datetime.utcnow().isoformat()}] Flight Agent: Return flight booked - {return_flight.flight_id}"
                 )
                 self.mcp_context.set_context(
                     "return_flight",
-                    return_flight,
+                    return_flight.model_dump(),
                     "flight_agent",
                     dependencies=["travel_request"],
                 )
@@ -102,10 +109,10 @@ class MetaAgent:
             if hotel:
                 itinerary.hotel = hotel
                 itinerary.agent_logs.append(
-                    f"[{datetime.utcnow().isoformat()}] Hotel Agent: Accommodation booked - {hotel.get('name')}"
+                    f"[{datetime.utcnow().isoformat()}] Hotel Agent: Accommodation booked - {hotel.name}"
                 )
                 self.mcp_context.set_context(
-                    "hotel", hotel, "hotel_agent", dependencies=["outbound_flight"]
+                    "hotel", hotel.model_dump(), "hotel_agent", dependencies=["outbound_flight"]
                 )
 
             weather_forecast = await self._get_weather_forecast(request)
@@ -148,7 +155,7 @@ class MetaAgent:
 
         return itinerary
 
-    async def _book_outbound_flight(self, request: TravelRequest) -> Dict[str, Any]:
+    async def _book_outbound_flight(self, request: TravelRequest) -> FlightDetails | None:
         """Book outbound flight"""
         response = await self.a2a_protocol.send_message(
             "meta_agent",
@@ -166,11 +173,11 @@ class MetaAgent:
             flights = response["data"]
             for flight in flights:
                 if flight["price"] <= request.budget * 0.4:
-                    return flight
-            return flights[0] if flights else None
+                    return FlightDetails(**flight)
+            return FlightDetails(**flights[0]) if flights else None
         return None
 
-    async def _book_return_flight(self, request: TravelRequest) -> Dict[str, Any]:
+    async def _book_return_flight(self, request: TravelRequest) -> FlightDetails | None:
         """Book return flight"""
         response = await self.a2a_protocol.send_message(
             "meta_agent",
@@ -188,11 +195,11 @@ class MetaAgent:
             flights = response["data"]
             for flight in flights:
                 if flight["price"] <= request.budget * 0.4:
-                    return flight
-            return flights[0] if flights else None
+                    return FlightDetails(**flight)
+            return FlightDetails(**flights[0]) if flights else None
         return None
 
-    async def _book_hotel(self, request: TravelRequest) -> Dict[str, Any]:
+    async def _book_hotel(self, request: TravelRequest) -> HotelDetails | None:
         """Book hotel"""
         response = await self.a2a_protocol.send_message(
             "meta_agent",
@@ -210,11 +217,11 @@ class MetaAgent:
             hotels = response["data"]
             for hotel in hotels:
                 if hotel["total_price"] <= request.budget * 0.4:
-                    return hotel
-            return hotels[0] if hotels else None
+                    return HotelDetails(**hotel)
+            return HotelDetails(**hotels[0]) if hotels else None
         return None
 
-    async def _get_weather_forecast(self, request: TravelRequest) -> List:
+    async def _get_weather_forecast(self, request: TravelRequest) -> List[WeatherInfo]:
         """Get weather forecast"""
         from datetime import datetime, timedelta
 
@@ -230,14 +237,12 @@ class MetaAgent:
         )
 
         if response.get("status") == "success" and response.get("data"):
-            from src.models.schemas import WeatherInfo
-
             return [WeatherInfo(**w) for w in response["data"]]
         return []
 
     async def _recommend_activities(
-        self, request: TravelRequest, weather_forecast: List
-    ) -> List:
+        self, request: TravelRequest, weather_forecast: List[WeatherInfo]
+    ) -> List[ActivityDetails]:
         """Recommend activities"""
         preferences = request.preferences or {}
         category = preferences.get("activity_preference", "Sightseeing")
@@ -254,8 +259,6 @@ class MetaAgent:
         )
 
         if response.get("status") == "success" and response.get("data"):
-            from src.models.schemas import ActivityDetails
-
             return [ActivityDetails(**a) for a in response["data"][:3]]
         return []
 

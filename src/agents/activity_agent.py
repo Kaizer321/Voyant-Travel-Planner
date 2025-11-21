@@ -1,4 +1,6 @@
+import os
 from crewai import Agent, Task
+from crewai.llm import LLM
 from typing import Dict, Any
 from src.mock_apis.activity_api import MockActivityAPI
 from src.protocols.a2a_protocol import AgentInterface
@@ -22,6 +24,7 @@ class ActivityAgent(AgentInterface):
             "Specializes in creating memorable travel experiences tailored to individual preferences.",
             verbose=True,
             allow_delegation=False,
+            llm=LLM(model=os.getenv("CREWAI_DEFAULT_MODEL", "gemini-1.5-flash")),
         )
 
     async def receive_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
