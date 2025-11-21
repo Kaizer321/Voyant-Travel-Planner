@@ -9,6 +9,16 @@
 
 Voyant orchestrates specialized AI agents to create comprehensive travel itineraries with intelligent failure recovery mechanisms, all through a beautiful ChatGPT-style minimal interface.
 
+## 🎥 Demo Video
+
+<video src="attached_assets/demo.mp4" controls="controls" style="max-width: 100%;">
+  Your browser does not support the video tag.
+</video>
+
+> *Watch Voyant in action: Planning a complete trip to Paris with real-time agent coordination.*
+>
+> *(Note: Place your video file named `demo.mp4` in the `attached_assets` folder)*
+
 ## ✨ Key Features
 
 ### 🤖 Multi-Agent Architecture
