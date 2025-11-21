@@ -11,7 +11,7 @@ Voyant orchestrates specialized AI agents to create comprehensive travel itinera
 
 ## 🎥 Demo Video
 
-<video src="attached_assets/demo.mp4" controls="controls" style="max-width: 100%;">
+<video src="attached_assets/Demo.mp4" controls="controls" style="max-width: 100%;">
   Your browser does not support the video tag.
 </video>
 
